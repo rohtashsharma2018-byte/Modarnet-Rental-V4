@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { supabase } from "../../lib/supabase";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Search, ShieldAlert, Shield, ShieldOff, Trash2, Plus, X, Eye, EyeOff } from "lucide-react";
+import { Search, ShieldAlert, Shield, ShieldOff, Trash2, Plus, X, Eye, EyeOff, Key } from "lucide-react";
 import { UserProfile } from "../../types";
 import { Button } from "../../components/ui/button";
 
@@ -13,6 +13,9 @@ export default function UserManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [resettingUser, setResettingUser] = useState<UserProfile | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [isResetLoading, setIsResetLoading] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
 
@@ -64,6 +67,43 @@ export default function UserManagement() {
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to add user");
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resettingUser || !newPassword) return;
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
+    try {
+      setIsResetLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch("/api/admin/reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({
+          userId: resettingUser.id,
+          newPassword: newPassword
+        })
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Reset failed");
+
+      toast.success(`Password updated for ${resettingUser.name}`);
+      setResettingUser(null);
+      setNewPassword("");
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsResetLoading(false);
     }
   };
 
@@ -197,6 +237,63 @@ export default function UserManagement() {
         </div>
       )}
 
+      {resettingUser && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in zoom-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Reset Password</h3>
+                <p className="text-[10px] text-slate-500 font-medium">Update password for {resettingUser.name}</p>
+              </div>
+              <button onClick={() => setResettingUser(null)} className="p-1.5 hover:bg-white rounded-full text-slate-400 border border-transparent hover:border-slate-200">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleResetPassword} className="p-5 space-y-4">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-wider">New Password</label>
+                <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none pr-11 transition-all"
+                    placeholder="Min 6 characters"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setResettingUser(null)}
+                  className="flex-1 rounded-lg h-10 text-xs font-bold"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={isResetLoading}
+                  className="flex-1 bg-amber-500 hover:bg-amber-600 rounded-lg h-10 text-xs font-bold text-white shadow-md shadow-amber-100"
+                >
+                  {isResetLoading ? "Updating..." : "Update Password"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
         <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
           <h3 className="font-bold text-slate-800 text-sm">All Users</h3>
@@ -211,18 +308,19 @@ export default function UserManagement() {
                 <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider">Joining Date</th>
                 <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider">User Info</th>
                 <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider">Role & Status</th>
+                <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading && users.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="px-4 py-12 text-center text-xs text-slate-500 font-bold uppercase tracking-widest">
+                  <td colSpan={4} className="px-4 py-12 text-center text-xs text-slate-500 font-bold uppercase tracking-widest">
                     Loading users...
                   </td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="px-4 py-12 text-center text-xs text-slate-500 italic font-medium">
+                  <td colSpan={4} className="px-4 py-12 text-center text-xs text-slate-500 italic font-medium">
                     No users found.
                   </td>
                 </tr>
@@ -247,6 +345,20 @@ export default function UserManagement() {
                         {u.role === 'blocked' && <ShieldOff className="w-3 h-3" />}
                         {u.role || 'user'}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setResettingUser(u);
+                          setNewPassword("");
+                        }}
+                        className="h-8 px-3 text-[10px] font-bold uppercase tracking-tight border-slate-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition-all gap-1.5"
+                      >
+                        <Key className="w-3 h-3" />
+                        Reset Pwd
+                      </Button>
                     </td>
                   </tr>
                 ))

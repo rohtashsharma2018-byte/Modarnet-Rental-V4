@@ -1,14 +1,20 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { supabase, isPlaceholder } from "../lib/supabase";
 import { User } from "@supabase/supabase-js";
 
 interface AuthContextType {
   user: User | null;
   role: "admin" | "user" | "blocked" | null;
   loading: boolean;
+  isConfigured: boolean;
 }
 
-const AuthContext = createContext<AuthContextType>({ user: null, role: null, loading: true });
+const AuthContext = createContext<AuthContextType>({ 
+  user: null, 
+  role: null, 
+  loading: true,
+  isConfigured: !isPlaceholder
+});
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -19,7 +25,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let mounted = true;
 
     // If Supabase is not configured, don't wait for sessions
-    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+    if (isPlaceholder) {
       console.warn("Supabase credentials missing, skipping auth check.");
       setLoading(false);
       return;
@@ -106,7 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, loading }}>
+    <AuthContext.Provider value={{ user, role, loading, isConfigured: !isPlaceholder }}>
       {children}
     </AuthContext.Provider>
   );

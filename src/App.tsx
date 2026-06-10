@@ -26,7 +26,29 @@ const ProfileSettings = React.lazy(() => import('./pages/admin/ProfileSettings')
 const Payouts = React.lazy(() => import('./pages/admin/Payouts'));
 
 export default function App() {
-  const { user, role, loading } = useAuth();
+  const { user, role, loading, isConfigured } = useAuth();
+
+  if (!isConfigured) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-200 p-8 text-center space-y-6">
+          <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-xl font-bold text-slate-900 uppercase tracking-tight">Configuration Required</h1>
+            <p className="text-sm text-slate-500 leading-relaxed">
+              Supabase environment variables are missing or set to placeholder values. 
+              Please configure <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-[11px] font-bold">VITE_SUPABASE_URL</code> and <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-[11px] font-bold">VITE_SUPABASE_ANON_KEY</code> in your environment or Secrets panel.
+            </p>
+          </div>
+          <div className="pt-2 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+            Modarnet V4 • Internal Portal
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return <div className="min-h-screen bg-[#f5f5f5] flex items-center justify-center font-sans text-slate-400 text-xs font-bold uppercase tracking-widest">Loading Modarnet...</div>;

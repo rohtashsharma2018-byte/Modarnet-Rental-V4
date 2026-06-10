@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../../lib/supabase";
 import { Laptop } from "../../types";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
-import { Folder, Download, Image, X } from "lucide-react";
+import { Folder, Download, Image, X, GripVertical } from "lucide-react";
 
 interface LaptopForm {
   name: string;
@@ -29,6 +29,52 @@ export default function Inventory() {
   const [nextProductCode, setNextProductCode] = useState("");
   const [fullViewImage, setFullViewImage] = useState<string | null>(null);
   const [currentGallery, setCurrentGallery] = useState<string[]>([]);
+
+  // Column Resizing State
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+    img: 60,
+    code: 130,
+    catalogue: 90,
+    model: 250,
+    category: 120,
+    totalPrice: 110,
+    sellPrice: 110,
+    dayPrice: 110,
+    stock: 120,
+    actions: 130
+  });
+
+  const resizingColumn = useRef<string | null>(null);
+  const startX = useRef<number>(0);
+  const startWidth = useRef<number>(0);
+
+  const onMouseDown = (e: React.MouseEvent, column: string) => {
+    resizingColumn.current = column;
+    startX.current = e.clientX;
+    startWidth.current = columnWidths[column];
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
+
+  const onMouseMove = (e: MouseEvent) => {
+    if (!resizingColumn.current) return;
+    const diff = e.clientX - startX.current;
+    const newWidth = Math.max(50, startWidth.current + diff);
+    setColumnWidths(prev => ({
+      ...prev,
+      [resizingColumn.current!]: newWidth
+    }));
+  };
+
+  const onMouseUp = () => {
+    resizingColumn.current = null;
+    document.removeEventListener("mousemove", onMouseMove);
+    document.removeEventListener("mouseup", onMouseUp);
+    document.body.style.cursor = "default";
+    document.body.style.userSelect = "auto";
+  };
   
   const { register, handleSubmit, reset } = useForm<LaptopForm>({
     defaultValues: {
@@ -495,25 +541,39 @@ export default function Inventory() {
         )}
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
+          <table className="w-full text-left text-sm table-fixed min-w-[1200px]">
+            <thead className="bg-slate-50 text-slate-500 border-b border-slate-100 select-none">
               <tr>
-                <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider">Img</th>
-                <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider">Product Code</th>
-                <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider text-center">Catalogue</th>
-                <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider">Product Model</th>
-                <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider">Category</th>
-                <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider">Total Price</th>
-                <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider">Sell Price</th>
-                <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider">Price / Day</th>
-                <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider">Stock</th>
-                <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider text-right">Actions</th>
+                {[
+                  { id: 'img', label: 'Img' },
+                  { id: 'code', label: 'Product Code' },
+                  { id: 'catalogue', label: 'Catalogue', className: 'text-center' },
+                  { id: 'model', label: 'Product Model' },
+                  { id: 'category', label: 'Category' },
+                  { id: 'totalPrice', label: 'Total Price' },
+                  { id: 'sellPrice', label: 'Sell Price' },
+                  { id: 'dayPrice', label: 'Price / Day' },
+                  { id: 'stock', label: 'Stock' },
+                  { id: 'actions', label: 'Actions', className: 'text-right' }
+                ].map((col) => (
+                  <th 
+                    key={col.id} 
+                    style={{ width: columnWidths[col.id] }}
+                    className={`relative px-4 py-3 font-semibold text-[11px] uppercase tracking-wider group ${col.className || ''}`}
+                  >
+                    <div className="truncate">{col.label}</div>
+                    <div 
+                      onMouseDown={(e) => onMouseDown(e, col.id)}
+                      className="absolute top-0 right-0 h-full w-1 cursor-col-resize hover:bg-blue-400 active:bg-blue-600 transition-colors z-10"
+                    />
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {laptops.map(l => (
                 <tr key={l.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 truncate align-top">
                     {l.image_url ? (
                       <div 
                         className="w-10 h-10 rounded border border-slate-200 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
@@ -530,12 +590,12 @@ export default function Inventory() {
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 truncate">
                     <span className="font-mono text-[10px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
                       {l.product_code || 'N/A'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-4 py-3 text-center truncate align-top">
                     {l.catalogue_url ? (
                       <div className="flex flex-col gap-1">
                         <a 
@@ -549,29 +609,29 @@ export default function Inventory() {
                         </a>
                       </div>
                     ) : (
-                      <span className="text-slate-300 flex items-center gap-1 opacity-40 text-[10px] font-medium"><Folder className="w-3 h-3" /> NONE</span>
+                      <span className="text-slate-300 flex items-center justify-center gap-1 opacity-40 text-[10px] font-medium"><Folder className="w-3 h-3" /> NONE</span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-col">
+                  <td className="px-4 py-3 align-top">
+                    <div className="flex flex-col whitespace-normal break-words">
                       <span className="font-bold text-slate-800 text-xs">{l.name}</span>
-                      <span className="text-[10px] text-slate-500 line-clamp-1">{l.description}</span>
+                      <span className="text-[10px] text-slate-500 mt-0.5">{l.description}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
-                    <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">{l.category || 'General'}</span>
+                  <td className="px-4 py-3 truncate align-top">
+                    <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium truncate inline-block max-w-full">{l.category || 'General'}</span>
                   </td>
-                  <td className="px-4 py-3 text-slate-600 text-xs">{l.price ? `₹${l.price}` : '-'}</td>
-                  <td className="px-4 py-3 text-slate-600 text-xs">{l.sell_price ? `₹${l.sell_price}` : '-'}</td>
-                  <td className="px-4 py-3 text-slate-600 text-xs">₹{l.price_per_day}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${l.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-rose-100 text-rose-700'}`}>
+                  <td className="px-4 py-3 text-slate-600 text-xs truncate align-top">{l.price ? `₹${l.price}` : '-'}</td>
+                  <td className="px-4 py-3 text-slate-600 text-xs truncate align-top">{l.sell_price ? `₹${l.sell_price}` : '-'}</td>
+                  <td className="px-4 py-3 text-slate-600 text-xs truncate align-top">₹{l.price_per_day}</td>
+                  <td className="px-4 py-3 truncate align-top">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold truncate inline-block ${l.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-rose-100 text-rose-700'}`}>
                       {l.stock} {l.stock > 0 ? 'Available' : 'Out'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right space-x-1">
-                    <button onClick={() => handleEdit(l)} className="px-2 py-1 bg-white text-slate-600 border border-slate-200 rounded text-xs font-bold hover:bg-slate-50">Edit</button>
-                    <button onClick={() => checkIfCanDelete(l.id)} className="px-2 py-1 bg-white text-rose-600 border border-slate-200 rounded text-xs font-bold hover:bg-rose-50">Del</button>
+                  <td className="px-4 py-3 text-right space-x-1 truncate align-top">
+                    <button onClick={() => handleEdit(l)} className="px-2 py-1 bg-white text-slate-600 border border-slate-200 rounded text-[10px] font-bold hover:bg-slate-50">Edit</button>
+                    <button onClick={() => checkIfCanDelete(l.id)} className="px-2 py-1 bg-white text-rose-600 border border-slate-200 rounded text-[10px] font-bold hover:bg-rose-50">Del</button>
                   </td>
                 </tr>
               ))}

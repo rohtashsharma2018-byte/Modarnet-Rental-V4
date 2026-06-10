@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../../lib/supabase";
 import { Laptop } from "../../types";
 import { toast } from "sonner";
@@ -12,6 +12,51 @@ export default function InventoryView() {
   const [loading, setLoading] = useState(true);
   const [fullViewImage, setFullViewImage] = useState<string | null>(null);
   const [currentGallery, setCurrentGallery] = useState<string[]>([]);
+
+  // Column Resizing State
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+    img: 60,
+    code: 90,
+    catalogue: 100,
+    model: 250,
+    category: 120,
+    purchasePrice: 130,
+    rentalPrice: 120,
+    status: 120,
+    actions: 180
+  });
+
+  const resizingColumn = useRef<string | null>(null);
+  const startX = useRef<number>(0);
+  const startWidth = useRef<number>(0);
+
+  const onMouseDown = (e: React.MouseEvent, column: string) => {
+    resizingColumn.current = column;
+    startX.current = e.clientX;
+    startWidth.current = columnWidths[column];
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
+
+  const onMouseMove = (e: MouseEvent) => {
+    if (!resizingColumn.current) return;
+    const diff = e.clientX - startX.current;
+    const newWidth = Math.max(50, startWidth.current + diff);
+    setColumnWidths(prev => ({
+      ...prev,
+      [resizingColumn.current!]: newWidth
+    }));
+  };
+
+  const onMouseUp = () => {
+    resizingColumn.current = null;
+    document.removeEventListener("mousemove", onMouseMove);
+    document.removeEventListener("mouseup", onMouseUp);
+    document.body.style.cursor = "default";
+    document.body.style.userSelect = "auto";
+  };
   
   useEffect(() => {
     fetchLaptops();
@@ -151,18 +196,32 @@ export default function InventoryView() {
 
         {viewMode === "list" ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
+            <table className="w-full text-left text-sm table-fixed min-w-[1100px]">
+              <thead className="bg-slate-50 text-slate-500 border-b border-slate-100 select-none">
                 <tr>
-                  <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider">Img</th>
-                  <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider text-center tracking-tight">Code</th>
-                  <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider text-center">Catalogue</th>
-                  <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider">Product Model</th>
-                  <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider">Category</th>
-                  <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider">Purchase Price</th>
-                  <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider">Rental / Day</th>
-                  <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 font-semibold text-[11px] uppercase tracking-wider text-right">Actions</th>
+                  {[
+                    { id: 'img', label: 'Img' },
+                    { id: 'code', label: 'Code', className: 'text-center' },
+                    { id: 'catalogue', label: 'Catalogue', className: 'text-center' },
+                    { id: 'model', label: 'Product Model' },
+                    { id: 'category', label: 'Category' },
+                    { id: 'purchasePrice', label: 'Purchase Price' },
+                    { id: 'rentalPrice', label: 'Rental / Day' },
+                    { id: 'status', label: 'Status' },
+                    { id: 'actions', label: 'Actions', className: 'text-right' }
+                  ].map((col) => (
+                    <th 
+                      key={col.id} 
+                      style={{ width: columnWidths[col.id] }}
+                      className={`relative px-4 py-3 font-semibold text-[11px] uppercase tracking-wider group ${col.className || ''}`}
+                    >
+                      <div className="truncate">{col.label}</div>
+                      <div 
+                        onMouseDown={(e) => onMouseDown(e, col.id)}
+                        className="absolute top-0 right-0 h-full w-1 cursor-col-resize hover:bg-blue-400 active:bg-blue-600 transition-colors z-10"
+                      />
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -172,7 +231,7 @@ export default function InventoryView() {
                   </tr>
                 ) : laptops.map(l => (
                   <tr key={l.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2 truncate align-top">
                       {l.image_url ? (
                         <div 
                           className="w-10 h-10 rounded border border-slate-200 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
@@ -189,52 +248,52 @@ export default function InventoryView() {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="font-mono text-[9px] font-black text-blue-600 bg-blue-50 px-1 py-0.5 rounded border border-blue-100">
+                    <td className="px-4 py-3 text-center truncate align-top">
+                      <span className="font-mono text-[9px] font-black text-blue-600 bg-blue-50 px-1 py-0.5 rounded border border-blue-100 italic">
                         {l.product_code || '---'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3 text-center truncate align-top">
                       {l.catalogue_url ? (
                         <a 
                           href={l.catalogue_url} 
                           target="_blank" 
-                          rel="noreferrer"
+                          rel="noreferrer" 
                           className="text-orange-500 hover:text-orange-700 transition-colors inline-flex items-center gap-1 font-bold text-[10px]"
                         >
                           <Folder className="w-3.5 h-3.5" />
-                          CATALOGUE
+                          LINK
                         </a>
                       ) : (
-                        <span className="text-slate-300 flex items-center gap-1 opacity-40 text-[10px] font-medium italic"><Folder className="w-3.5 h-3.5" /> N/A</span>
+                        <span className="text-slate-300 flex items-center justify-center gap-1 opacity-40 text-[10px] font-medium italic"><Folder className="w-3.5 h-3.5" /> N/A</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col">
+                    <td className="px-4 py-3 align-top">
+                      <div className="flex flex-col whitespace-normal break-words">
                         <span className="font-bold text-slate-800 text-xs">{l.name}</span>
-                        <span className="text-[10px] text-slate-500 line-clamp-1 italic">{l.description}</span>
+                        <span className="text-[10px] text-slate-500 italic mt-0.5">{l.description}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold uppercase">{l.category || 'General'}</span>
+                    <td className="px-4 py-3 truncate align-top">
+                      <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold uppercase truncate inline-block max-w-full">{l.category || 'General'}</span>
                     </td>
-                    <td className="px-4 py-3 text-slate-600 text-xs font-medium">
+                    <td className="px-4 py-3 text-slate-600 text-xs font-medium truncate align-top">
                       {l.sell_price ? `₹${l.sell_price.toLocaleString()}` : 'Contact Support'}
                     </td>
-                    <td className="px-4 py-3 text-slate-600 text-xs font-medium">
+                    <td className="px-4 py-3 text-slate-600 text-xs font-medium truncate align-top">
                       ₹{l.price_per_day.toLocaleString()}
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${l.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-rose-100 text-rose-700'}`}>
-                        {l.stock > 0 ? 'Instock' : 'Out of Stock'}
+                    <td className="px-4 py-3 truncate align-top">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase truncate inline-block ${l.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-rose-100 text-rose-700'}`}>
+                        {l.stock > 0 ? 'Instock' : 'Out'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <td className="px-4 py-3 text-right truncate align-top">
                       <div className="inline-flex gap-1.5">
                         <button
                           onClick={() => navigate(`/request?laptopId=${l.id}`)}
                           disabled={l.stock === 0}
-                          className="inline-flex items-center gap-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:hover:bg-amber-500 text-white px-2.5 py-1.5 rounded text-xs font-bold transition-all active:scale-[0.98] cursor-pointer shadow-sm"
+                          className="inline-flex items-center gap-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:hover:bg-amber-500 text-white px-2.5 py-1.5 rounded text-[10px] font-bold transition-all active:scale-[0.98] cursor-pointer shadow-sm"
                         >
                           <Calendar className="w-3 h-3" />
                           <span>Rent</span>
@@ -242,7 +301,7 @@ export default function InventoryView() {
                         <button
                           onClick={() => navigate(`/purchase?laptopId=${l.id}`)}
                           disabled={l.stock === 0}
-                          className="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 text-white px-2.5 py-1.5 rounded text-xs font-bold transition-all active:scale-[0.98] cursor-pointer shadow-sm"
+                          className="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 text-white px-2.5 py-1.5 rounded text-[10px] font-bold transition-all active:scale-[0.98] cursor-pointer shadow-sm"
                         >
                           <ShoppingCart className="w-3 h-3" />
                           <span>Buy</span>
